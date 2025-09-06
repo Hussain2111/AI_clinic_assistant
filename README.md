@@ -137,4 +137,8 @@ yarn-error.log*
 
 # OS
 .DS_Store
+<<<<<<< HEAD
 Thumbs.db
+=======
+Thumbs.db
+>>>>>>> cf0a2550b2252ea71c23771504d0a348760a2b2b
