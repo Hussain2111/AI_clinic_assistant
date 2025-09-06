@@ -3,19 +3,20 @@ import { Phone, PhoneCall, Clock, User, Mic, MicOff, Volume2, Play, Pause } from
 
 const AIClinicWidget = () => {
   const [callData, setCallData] = useState({
-    from: '+1 (555) 123-4567',
+    from: '+44 7700 900123',
     duration: 0,
     status: 'active',
     patientId: 'PT-2024-001',
     patientName: 'Sarah Johnson',
-    startTime: new Date()
+    startTime: new Date(),
+    priority: 'HIGH',
+    reason: 'Chest pain and shortness of breath'
   });
 
   const [audioLevel, setAudioLevel] = useState(0);
   const [transcription, setTranscription] = useState([]);
   const [llmReasoning, setLlmReasoning] = useState([]);
   const [isCallActive, setIsCallActive] = useState(true);
-  const [isPlaying, setIsPlaying] = useState(false);
   const [currentSpeaker, setCurrentSpeaker] = useState(null);
   const [voiceDiagnostics, setVoiceDiagnostics] = useState([]);
 
@@ -23,42 +24,30 @@ const AIClinicWidget = () => {
   const reasoningRef = useRef(null);
   const canvasRef = useRef(null);
   const diagnosticsRef = useRef(null);
-  const audioContextRef = useRef(null);
-  const analyserRef = useRef(null);
-  const dataArrayRef = useRef(null);
 
-  // Fake conversation timeline with speaker changes and audio levels
+  // Conversation timeline
   const conversationTimeline = [
-    { time: 0, speaker: 'Assistant', text: 'Hello! Thank you for calling. Can you please verify your date of birth?', audioIntensity: 0.6, duration: 4000 },
-    { time: 5000, speaker: 'Caller', text: 'Sure, it\'s March 15th, 1985.', audioIntensity: 0.8, duration: 3000 },
-    { time: 9000, speaker: 'Assistant', text: 'Thank you, Sarah. I see your information here. What can I help you with today?', audioIntensity: 0.5, duration: 4500 },
-    { time: 14500, speaker: 'Caller', text: 'I\'ve been having persistent headaches for the past week and wanted to schedule an appointment.', audioIntensity: 0.9, duration: 5000 },
-    { time: 20500, speaker: 'Assistant', text: 'I understand your concern. Let me check Dr. Smith\'s availability for a consultation.', audioIntensity: 0.7, duration: 4000 },
-    { time: 25500, speaker: 'Caller', text: 'That would be great, thank you.', audioIntensity: 0.6, duration: 2500 },
-    { time: 29000, speaker: 'Assistant', text: 'I have an opening tomorrow at 2:30 PM or Friday at 10:00 AM. Which works better for you?', audioIntensity: 0.6, duration: 5000 }
+    { time: 0, speaker: 'Patient', text: 'Hello, this is Sarah Johnson', audioIntensity: 0.6, duration: 3000 },
+    { time: 4000, speaker: 'Assistant', text: 'Hi Sarah, I can help you today. What\'s the reason for your call?', audioIntensity: 0.5, duration: 4000 },
+    { time: 9000, speaker: 'Patient', text: 'I\'ve been having chest pain and shortness of breath for the past hour', audioIntensity: 0.8, duration: 5000 },
+    { time: 15000, speaker: 'Assistant', text: 'I understand this is concerning. Let me check for urgent care availability immediately.', audioIntensity: 0.6, duration: 4500 }
   ];
 
   const reasoningTimeline = [
     { time: 1000, step: 'Patient Identification', status: 'completed', details: 'Verified caller identity using DOB', confidence: 0.95 },
-    { time: 6000, step: 'Intent Recognition', status: 'processing', details: 'Analyzing conversation for primary intent', confidence: 0.85 },
-    { time: 15000, step: 'Symptom Analysis', status: 'completed', details: 'Detected headache symptoms - flagged for medical attention', confidence: 0.92 },
-    { time: 21000, step: 'Provider Matching', status: 'processing', details: 'Matching symptoms with appropriate specialist', confidence: 0.88 },
-    { time: 26000, step: 'Availability Check', status: 'completed', details: 'Found available slots with Dr. Smith', confidence: 0.98 },
-    { time: 30000, step: 'Appointment Options', status: 'processing', details: 'Presenting scheduling options to patient', confidence: 0.94 }
+    { time: 6000, step: 'Symptom Analysis', status: 'processing', details: 'Analyzing chest pain and breathing symptoms', confidence: 0.88 },
+    { time: 12000, step: 'Urgency Assessment', status: 'completed', details: 'High priority - potential cardiac event', confidence: 0.94 },
+    { time: 18000, step: 'Provider Matching', status: 'processing', details: 'Connecting to emergency services', confidence: 0.92 }
   ];
 
   const voiceDiagnosticsTimeline = [
-    { time: 2000, symptom: 'Voice Quality', status: 'analyzing', finding: 'Normal vocal tone and clarity', confidence: 0.88, severity: 'normal' },
-    { time: 7000, symptom: 'Coughing', status: 'detected', finding: 'Mild dry cough detected (2 instances)', confidence: 0.92, severity: 'mild' },
-    { time: 12000, symptom: 'Breathing Pattern', status: 'analyzing', finding: 'Regular breathing rhythm observed', confidence: 0.85, severity: 'normal' },
-    { time: 16000, symptom: 'Speech Pace', status: 'completed', finding: 'Slightly slower speech - possible fatigue', confidence: 0.79, severity: 'mild' },
-    { time: 22000, symptom: 'Voice Strain', status: 'completed', finding: 'No signs of vocal strain or hoarseness', confidence: 0.94, severity: 'normal' },
-    { time: 28000, symptom: 'Respiratory Distress', status: 'completed', finding: 'No shortness of breath detected', confidence: 0.96, severity: 'normal' }
+    { time: 2000, symptom: 'Breathing Pattern', status: 'detected', finding: 'Shortness of breath detected', confidence: 0.92, severity: 'HIGH' },
+    { time: 8000, symptom: 'Voice Strain', status: 'analyzing', finding: 'Stress indicators in voice pattern', confidence: 0.85, severity: 'MEDIUM' },
+    { time: 14000, symptom: 'Speech Pace', status: 'completed', finding: 'Rapid speech - anxiety indicators', confidence: 0.89, severity: 'MEDIUM' }
   ];
 
-  // Initialize fake audio context for realistic waveform
+  // Audio waveform simulation
   useEffect(() => {
-    // Create a more realistic waveform based on conversation timeline
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -72,7 +61,6 @@ const AIClinicWidget = () => {
 
     const drawWaveform = () => {
       if (!isCallActive) {
-        // Fade out the waveform when call is inactive
         waveData.shift();
         waveData.push(0);
       } else {
@@ -80,7 +68,6 @@ const AIClinicWidget = () => {
         let intensity = 0;
         let speakingNow = null;
 
-        // Find current speaker and intensity from timeline
         for (const event of conversationTimeline) {
           if (currentTime >= event.time && currentTime < event.time + event.duration) {
             intensity = event.audioIntensity;
@@ -89,7 +76,6 @@ const AIClinicWidget = () => {
           }
         }
 
-        // Add some randomness for realistic effect
         const baseNoise = Math.random() * 0.1;
         const speechPattern = Math.sin(currentTime * 0.02) * intensity;
         const finalIntensity = (speechPattern + baseNoise) * height * 0.4;
@@ -102,61 +88,24 @@ const AIClinicWidget = () => {
       }
 
       // Clear canvas
-      ctx.fillStyle = '#111827';
+      ctx.fillStyle = '#f8fafc';
       ctx.fillRect(0, 0, width, height);
 
-      // Draw waveform with speaker-based coloring
-      const gradient = ctx.createLinearGradient(0, 0, width, 0);
-      if (currentSpeaker === 'Caller') {
-        gradient.addColorStop(0, '#10b981');
-        gradient.addColorStop(1, '#34d399');
-      } else if (currentSpeaker === 'Assistant') {
-        gradient.addColorStop(0, '#3b82f6');
-        gradient.addColorStop(1, '#60a5fa');
-      } else {
-        gradient.addColorStop(0, '#6b7280');
-        gradient.addColorStop(1, '#9ca3af');
+      // Draw waveform bars
+      const barWidth = 2;
+      const barSpacing = 1;
+      const numBars = Math.floor(width / (barWidth + barSpacing));
+
+      ctx.fillStyle = '#3b82f6';
+      
+      for (let i = 0; i < numBars; i++) {
+        const dataIndex = Math.floor((i / numBars) * waveData.length);
+        const barHeight = Math.abs(waveData[dataIndex] || 0);
+        const x = i * (barWidth + barSpacing);
+        const y = (height - barHeight) / 2;
+        
+        ctx.fillRect(x, y, barWidth, barHeight);
       }
-
-      ctx.strokeStyle = gradient;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      
-      waveData.forEach((value, index) => {
-        const x = index;
-        const y = height / 2 - value; // Inverted for better visual
-        
-        if (index === 0) {
-          ctx.moveTo(x, y);
-        } else {
-          ctx.lineTo(x, y);
-        }
-      });
-      
-      ctx.stroke();
-
-      // Draw mirrored waveform below center line
-      ctx.beginPath();
-      waveData.forEach((value, index) => {
-        const x = index;
-        const y = height / 2 + value;
-        
-        if (index === 0) {
-          ctx.moveTo(x, y);
-        } else {
-          ctx.lineTo(x, y);
-        }
-      });
-      
-      ctx.stroke();
-
-      // Draw center line
-      ctx.strokeStyle = '#374151';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(0, height / 2);
-      ctx.lineTo(width, height / 2);
-      ctx.stroke();
 
       animationId = requestAnimationFrame(drawWaveform);
     };
@@ -170,7 +119,7 @@ const AIClinicWidget = () => {
     };
   }, [isCallActive]);
 
-  // Simulate call duration timer
+  // Duration timer
   useEffect(() => {
     const timer = setInterval(() => {
       if (isCallActive) {
@@ -184,7 +133,7 @@ const AIClinicWidget = () => {
     return () => clearInterval(timer);
   }, [isCallActive]);
 
-  // Simulate conversation following timeline
+  // Simulate conversation
   useEffect(() => {
     if (!isCallActive) return;
 
@@ -202,7 +151,6 @@ const AIClinicWidget = () => {
 
         setTranscription(prev => [...prev, newMessage]);
         
-        // Auto-scroll transcription
         setTimeout(() => {
           if (transcriptionRef.current) {
             transcriptionRef.current.scrollTop = transcriptionRef.current.scrollHeight;
@@ -218,11 +166,44 @@ const AIClinicWidget = () => {
     };
   }, [isCallActive]);
 
-  // Simulate voice diagnostics following timeline
+  // Simulate AI reasoning
   useEffect(() => {
     if (!isCallActive) return;
 
-    const startTime = Date.now();
+    const timers = [];
+
+    reasoningTimeline.forEach((event) => {
+      const timer = setTimeout(() => {
+        const newReasoning = {
+          id: Date.now() + Math.random(),
+          step: event.step,
+          status: event.status,
+          details: event.details,
+          confidence: event.confidence,
+          timestamp: new Date()
+        };
+
+        setLlmReasoning(prev => [...prev, newReasoning]);
+        
+        setTimeout(() => {
+          if (reasoningRef.current) {
+            reasoningRef.current.scrollTop = reasoningRef.current.scrollHeight;
+          }
+        }, 100);
+      }, event.time);
+
+      timers.push(timer);
+    });
+
+    return () => {
+      timers.forEach(timer => clearTimeout(timer));
+    };
+  }, [isCallActive]);
+
+  // Simulate voice diagnostics
+  useEffect(() => {
+    if (!isCallActive) return;
+
     const timers = [];
 
     voiceDiagnosticsTimeline.forEach((event) => {
@@ -239,46 +220,9 @@ const AIClinicWidget = () => {
 
         setVoiceDiagnostics(prev => [...prev, newDiagnostic]);
         
-        // Auto-scroll diagnostics
         setTimeout(() => {
           if (diagnosticsRef.current) {
             diagnosticsRef.current.scrollTop = diagnosticsRef.current.scrollHeight;
-          }
-        }, 100);
-      }, event.time);
-
-      timers.push(timer);
-    });
-
-    return () => {
-      timers.forEach(timer => clearTimeout(timer));
-    };
-  }, [isCallActive]);
-
-  // Simulate LLM reasoning following timeline
-  useEffect(() => {
-    if (!isCallActive) return;
-
-    const startTime = Date.now();
-    const timers = [];
-
-    reasoningTimeline.forEach((event) => {
-      const timer = setTimeout(() => {
-        const newReasoning = {
-          id: Date.now() + Math.random(),
-          step: event.step,
-          status: event.status,
-          details: event.details,
-          confidence: event.confidence,
-          timestamp: new Date()
-        };
-
-        setLlmReasoning(prev => [...prev, newReasoning]);
-        
-        // Auto-scroll reasoning
-        setTimeout(() => {
-          if (reasoningRef.current) {
-            reasoningRef.current.scrollTop = reasoningRef.current.scrollHeight;
           }
         }, 100);
       }, event.time);
@@ -297,53 +241,23 @@ const AIClinicWidget = () => {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const getSeverityColor = (severity) => {
+  const getPriorityColor = (priority) => {
+    switch (priority) {
+      case 'HIGH': return 'bg-red-500 text-white';
+      case 'MEDIUM': return 'bg-yellow-500 text-white';
+      case 'LOW': return 'bg-green-500 text-white';
+      default: return 'bg-gray-500 text-white';
+    }
+  };
+
+  const getTrafficLight = (severity) => {
     switch (severity) {
-      case 'normal': return 'text-green-400';
-      case 'mild': return 'text-yellow-400';
-      case 'moderate': return 'text-orange-400';
-      case 'severe': return 'text-red-400';
-      default: return 'text-gray-400';
-    }
-  };
-
-  const getSeverityBadge = (severity) => {
-    switch (severity) {
-      case 'normal': return 'bg-green-900 text-green-300';
-      case 'mild': return 'bg-yellow-900 text-yellow-300';
-      case 'moderate': return 'bg-orange-900 text-orange-300';
-      case 'severe': return 'bg-red-900 text-red-300';
-      default: return 'bg-gray-900 text-gray-300';
-    }
-  };
-
-  const getDiagnosticIcon = (symptom) => {
-    switch (symptom) {
-      case 'Coughing': return '🤧';
-      case 'Voice Quality': return '🎤';
-      case 'Breathing Pattern': return '🫁';
-      case 'Speech Pace': return '⏱️';
-      case 'Voice Strain': return '🗣️';
-      case 'Respiratory Distress': return '💨';
-      default: return '🔍';
-    }
-  };
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'completed': return 'text-green-400';
-      case 'processing': return 'text-yellow-400 animate-pulse';
-      case 'pending': return 'text-gray-400';
-      default: return 'text-gray-400';
-    }
-  };
-
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case 'completed': return '✓';
-      case 'processing': return '⟳';
-      case 'pending': return '○';
-      default: return '○';
+      case 'NORMAL': return '🟢';
+      case 'LOW': return '🟢';
+      case 'MEDIUM': return '🟡';
+      case 'HIGH': return '🔴';
+      case 'SEVERE': return '🔴';
+      default: return '⚫';
     }
   };
 
@@ -362,229 +276,151 @@ const AIClinicWidget = () => {
   };
 
   return (
-    <div className="bg-gray-900 text-white rounded-lg shadow-2xl max-w-6xl mx-auto overflow-hidden">
-      {/* Single Card Header */}
-      <div className="bg-gray-800 px-6 py-4 border-b border-gray-700">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className={`p-2 rounded-full ${isCallActive ? 'bg-green-500' : 'bg-red-500'}`}>
-              <PhoneCall className="w-5 h-5" />
-            </div>
-            <h1 className="text-xl font-bold">AI Clinical Assistant Control Panel</h1>
-            <div className={`px-3 py-1 rounded-full text-sm font-medium ${isCallActive ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'}`}>
-              {isCallActive ? 'Live Call' : 'Call Ended'}
-            </div>
-            {currentSpeaker && (
-              <div className="px-3 py-1 rounded-full text-sm bg-purple-900 text-purple-300">
-                🎤 {currentSpeaker}
-              </div>
-            )}
-          </div>
-          <div className="flex items-center space-x-3">
-            <button 
-              onClick={resetConversation}
-              className="px-3 py-1 text-sm bg-gray-700 hover:bg-gray-600 rounded transition-colors"
-            >
-              Reset
-            </button>
-            <button 
-              onClick={handleCallToggle}
-              className={`px-4 py-2 rounded-lg font-medium ${isCallActive ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'} transition-colors`}
-            >
-              {isCallActive ? 'End Call' : 'Start Call'}
-            </button>
+    <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6 max-w-md mx-auto">
+      {/* Header */}
+      <div className="flex items-start justify-between mb-4">
+        <div className="flex-1">
+          <h3 className="text-lg font-semibold text-gray-900 mb-1">
+            {callData.patientName}
+          </h3>
+          <p className="text-sm text-gray-600 mb-2">
+            {callData.from}
+          </p>
+        </div>
+        <span className={`px-3 py-1 rounded-full text-xs font-medium ${getPriorityColor(callData.priority)}`}>
+          {callData.priority}
+        </span>
+      </div>
+
+      {/* Reason for call with audio waveform */}
+      <div className="mb-4">
+        <h4 className="text-sm font-medium text-gray-700 mb-2">
+          Reason for call:
+        </h4>
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-sm text-gray-900 flex-1 mr-3">
+            {callData.reason}
+          </p>
+          <div className="bg-gray-50 rounded p-2 w-20 h-8 flex items-center">
+            <div className="w-2 h-2 bg-red-500 rounded-full mr-1"></div>
+            <canvas 
+              ref={canvasRef} 
+              width={60} 
+              height={16} 
+              className="w-12 h-4"
+            />
           </div>
         </div>
       </div>
 
-      {/* Main Content - Single Card with Sections in Separate Rows */}
-      <div className="p-6 space-y-6">
-        {/* Row 1 - Waveform */}
-        <div className="bg-gray-800 rounded-lg p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold flex items-center space-x-2">
-              {audioLevel > 0.2 ? <Volume2 className="w-4 h-4 text-green-400" /> : <Mic className="w-4 h-4 text-gray-400" />}
-              <span>Live Audio Waveform</span>
-              {currentSpeaker && (
-                <span className={`text-sm px-2 py-1 rounded ${currentSpeaker === 'Caller' ? 'bg-green-700' : 'bg-blue-700'}`}>
-                  {currentSpeaker} Speaking
+      {/* Duration */}
+      <div className="flex items-center mb-4">
+        <Clock className="w-4 h-4 text-gray-500 mr-2" />
+        <span className="text-sm font-medium text-gray-900">
+          {formatDuration(callData.duration)}
+        </span>
+      </div>
+
+      {/* Live Transcript */}
+      <div className="mb-4">
+        <div 
+          ref={transcriptionRef}
+          className="bg-gray-50 rounded-lg p-3 h-20 overflow-y-auto text-sm"
+        >
+          {transcription.length > 0 ? (
+            transcription.map((message, index) => (
+              <div key={message.id} className="mb-1 last:mb-0">
+                {index === transcription.length - 1 ? (
+                  <div>
+                    <span className="text-gray-900">{message.text}</span>
+                    <div className="flex items-center mt-1">
+                      <div className="w-1 h-1 bg-blue-500 rounded-full mr-1"></div>
+                      <span className="text-xs text-blue-600">Transcribing...</span>
+                    </div>
+                  </div>
+                ) : (
+                  <span className="text-gray-700">{message.text}</span>
+                )}
+              </div>
+            ))
+          ) : (
+            <div className="flex items-center">
+              <div className="w-1 h-1 bg-blue-500 rounded-full mr-1"></div>
+              <span className="text-xs text-blue-600">Transcribing...</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Voice Diagnostics */}
+      <div className="mb-4">
+        <h4 className="text-sm font-medium text-gray-700 mb-2">
+          Voice Analysis:
+        </h4>
+        <div 
+          ref={diagnosticsRef}
+          className="bg-gray-50 rounded-lg p-3 h-16 overflow-y-auto text-xs space-y-1"
+        >
+          {voiceDiagnostics.map((diagnostic) => (
+            <div key={diagnostic.id} className="flex items-center justify-between">
+              <span className="text-gray-900 text-xs">{diagnostic.symptom}:</span>
+              <div className="flex items-center space-x-1">
+                <span className="text-xs">{getTrafficLight(diagnostic.severity)}</span>
+                <span className="text-gray-600 text-xs">{diagnostic.finding}</span>
+                <span className="text-gray-500 text-xs">{(diagnostic.confidence * 100).toFixed(0)}%</span>
+              </div>
+            </div>
+          ))}
+          {voiceDiagnostics.length === 0 && (
+            <div className="text-gray-500 text-xs italic">Analyzing voice patterns...</div>
+          )}
+        </div>
+      </div>
+
+      {/* AI Reasoning */}
+      <div className="mb-4">
+        <h4 className="text-sm font-medium text-gray-700 mb-2">
+          AI Analysis:
+        </h4>
+        <div 
+          ref={reasoningRef}
+          className="bg-gray-50 rounded-lg p-3 h-16 overflow-y-auto text-xs space-y-1"
+        >
+          {llmReasoning.map((reasoning) => (
+            <div key={reasoning.id} className="flex items-center justify-between">
+              <span className="text-gray-900 text-xs">{reasoning.step}:</span>
+              <div className="flex items-center space-x-1">
+                <span className={`text-xs ${reasoning.status === 'completed' ? 'text-green-600' : 'text-yellow-600'}`}>
+                  {reasoning.status}
                 </span>
-              )}
-            </h3>
-            <div className="flex items-center space-x-4">
-              <div className="text-sm text-gray-400">
-                Level: <span className="font-mono">{(audioLevel * 100).toFixed(0)}%</span>
+                <span className="text-gray-500 text-xs">{(reasoning.confidence * 100).toFixed(0)}%</span>
               </div>
-              <div className={`w-3 h-3 rounded-full ${audioLevel > 0.3 ? 'bg-green-500' : 'bg-gray-500'} ${audioLevel > 0.3 ? 'animate-pulse' : ''}`}></div>
             </div>
-          </div>
-          <div className="bg-gray-900 rounded p-3">
-            <canvas 
-              ref={canvasRef} 
-              width={800} 
-              height={100} 
-              className="w-full h-24"
-            />
-          </div>
+          ))}
+          {llmReasoning.length === 0 && (
+            <div className="text-gray-500 text-xs italic">AI processing...</div>
+          )}
         </div>
+      </div>
 
-        {/* Row 2 - Call Data */}
-        <div className="bg-gray-800 rounded-lg p-4">
-          <h3 className="font-semibold mb-3 flex items-center space-x-2">
-            <Phone className="w-4 h-4" />
-            <span>Call Information</span>
-          </h3>
-          <div className="grid grid-cols-5 gap-6">
-            <div className="flex flex-col space-y-1">
-              <span className="text-gray-400 text-sm">From</span>
-              <span className="font-mono text-white">{callData.from}</span>
-            </div>
-            <div className="flex flex-col space-y-1">
-              <span className="text-gray-400 text-sm">Patient</span>
-              <span className="font-medium text-white">{callData.patientName}</span>
-            </div>
-            <div className="flex flex-col space-y-1">
-              <span className="text-gray-400 text-sm">Patient ID</span>
-              <span className="text-blue-400">{callData.patientId}</span>
-            </div>
-            <div className="flex flex-col space-y-1">
-              <span className="text-gray-400 text-sm">Duration</span>
-              <span className="font-mono text-green-400 text-lg">{formatDuration(callData.duration)}</span>
-            </div>
-            <div className="flex flex-col space-y-1">
-              <span className="text-gray-400 text-sm">Started</span>
-              <span className="text-white">{callData.startTime.toLocaleTimeString()}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Row 3 - Transcription */}
-        <div className="bg-gray-800 rounded-lg p-4">
-          <h3 className="font-semibold mb-3 flex items-center space-x-2">
-            <Mic className="w-4 h-4" />
-            <span>Live Transcription</span>
-          </h3>
-          <div 
-            ref={transcriptionRef}
-            className="bg-gray-900 rounded p-4 h-64 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600"
-          >
-            {transcription.map((message) => (
-              <div key={message.id} className="mb-3 last:mb-0">
-                <div className="flex items-start space-x-2 mb-1">
-                  <span className={`text-xs font-medium px-2 py-1 rounded ${
-                    message.speaker === 'Assistant' ? 'bg-blue-600' : 'bg-green-600'
-                  }`}>
-                    {message.speaker}
-                  </span>
-                  <span className="text-xs text-gray-400">
-                    {message.timestamp.toLocaleTimeString()}
-                  </span>
-                </div>
-                <p className="text-sm pl-2 border-l-2 border-gray-700">
-                  {message.text}
-                </p>
-              </div>
-            ))}
-            {transcription.length === 0 && (
-              <div className="text-gray-500 text-sm italic">
-                Waiting for conversation to begin...
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Row 4 - Voice Diagnostics */}
-        <div className="bg-gray-800 rounded-lg p-4">
-          <h3 className="font-semibold mb-3 flex items-center space-x-2">
-            <span className="text-red-400">🩺</span>
-            <span>Voice Diagnostics</span>
-            <span className="text-xs bg-red-900 text-red-300 px-2 py-1 rounded">
-              AI Health Analysis
-            </span>
-          </h3>
-          <div 
-            ref={diagnosticsRef}
-            className="bg-gray-900 rounded p-4 h-64 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600"
-          >
-            {voiceDiagnostics.map((diagnostic) => (
-              <div key={diagnostic.id} className="mb-4 last:mb-0">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center space-x-3">
-                    <span className="text-lg">{getDiagnosticIcon(diagnostic.symptom)}</span>
-                    <span className="text-sm font-medium">{diagnostic.symptom}</span>
-                    <span className={`text-xs px-2 py-1 rounded ${getSeverityBadge(diagnostic.severity)}`}>
-                      {diagnostic.severity.toUpperCase()}
-                    </span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-xs text-gray-400 bg-gray-700 px-2 py-1 rounded">
-                      {(diagnostic.confidence * 100).toFixed(0)}%
-                    </span>
-                    <span className={`text-xs px-2 py-1 rounded ${
-                      diagnostic.status === 'completed' ? 'bg-green-900 text-green-300' :
-                      diagnostic.status === 'detected' ? 'bg-yellow-900 text-yellow-300' :
-                      'bg-blue-900 text-blue-300'
-                    }`}>
-                      {diagnostic.status}
-                    </span>
-                  </div>
-                </div>
-                <p className="text-sm text-gray-300 pl-8">
-                  {diagnostic.finding}
-                </p>
-                <div className="text-xs text-gray-500 pl-8 mt-1">
-                  {diagnostic.timestamp.toLocaleTimeString()}
-                </div>
-              </div>
-            ))}
-            {voiceDiagnostics.length === 0 && (
-              <div className="text-gray-500 text-sm italic">
-                Voice analysis will appear here...
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Row 5 - AI Reasoning */}
-        <div className="bg-gray-800 rounded-lg p-4">
-          <h3 className="font-semibold mb-3 flex items-center space-x-2">
-            <span className="text-purple-400">🧠</span>
-            <span>AI Reasoning</span>
-          </h3>
-          <div 
-            ref={reasoningRef}
-            className="bg-gray-900 rounded p-4 h-64 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600"
-          >
-            {llmReasoning.map((reasoning) => (
-              <div key={reasoning.id} className="mb-4 last:mb-0">
-                <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center space-x-2">
-                    <span className={`text-sm ${getStatusColor(reasoning.status)}`}>
-                      {getStatusIcon(reasoning.status)}
-                    </span>
-                    <span className="text-sm font-medium">{reasoning.step}</span>
-                  </div>
-                  {reasoning.confidence && (
-                    <span className="text-xs text-gray-400 bg-gray-700 px-2 py-1 rounded">
-                      {(reasoning.confidence * 100).toFixed(0)}%
-                    </span>
-                  )}
-                </div>
-                <p className="text-xs text-gray-300 pl-6">
-                  {reasoning.details}
-                </p>
-                <div className="text-xs text-gray-500 pl-6 mt-1">
-                  {reasoning.timestamp.toLocaleTimeString()}
-                </div>
-              </div>
-            ))}
-            {llmReasoning.length === 0 && (
-              <div className="text-gray-500 text-sm italic">
-                AI reasoning will appear here...
-              </div>
-            )}
-          </div>
-        </div>
+      {/* Control Buttons */}
+      <div className="flex space-x-2">
+        <button 
+          onClick={resetConversation}
+          className="flex-1 px-3 py-2 text-sm border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+        >
+          Reset
+        </button>
+        <button 
+          onClick={handleCallToggle}
+          className={`flex-1 px-3 py-2 text-sm rounded-md transition-colors ${
+            isCallActive 
+              ? 'bg-red-500 text-white hover:bg-red-600' 
+              : 'bg-green-500 text-white hover:bg-green-600'
+          }`}
+        >
+          {isCallActive ? 'End Call' : 'Start Call'}
+        </button>
       </div>
     </div>
   );
